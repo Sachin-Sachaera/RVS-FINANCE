@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Incomplete Payments with Edit</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+    .home-link { position: fixed; top: 10px; left: 10px; font-size: 24px; text-decoration: none; color: #007bff; }
+    h1 { text-align: center; color: #dc3545; }
+    .customer-card { background: #fff; border-left: 5px solid #dc3545; margin-bottom: 15px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 15px; cursor: pointer; transition: 0.3s; }
+    .customer-card:hover { transform: scale(1.02); background: #fafafa; }
+    .details { background: #fff; margin-top: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 10px; }
+    .month-row { background: #ffe082; padding: 10px; border-radius: 8px; margin-bottom: 8px; white-space: pre-wrap; word-wrap: break-word; }
+    .month-row.paid { background: #a5d6a7; }
+    .payment-entry { margin-left: 20px; margin-bottom: 5px; }
+    .input-amount, .edit-input { width: 80px; padding: 5px; border: 1px solid #aaa; border-radius: 5px; }
+    .pay-btn, .edit-btn { background: #28a745; color: white; border: none; padding: 5px 12px; border-radius: 5px; margin-left: 5px; cursor: pointer; }
+    .edit-btn { background: #007bff; }
+  </style>
+</head>
+<body>
+
+<a href="Home.html" class="home-link">🏠</a>
+<h1>❌ Incomplete Payments</h1>
+<div id="incompletePaymentsList"></div>
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const listEl = document.getElementById('incompletePaymentsList');
+
+function render() {
+  listEl.innerHTML = '';
+  customers.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'customer-card';
+    card.textContent = c.name;
+    card.addEventListener('click', () => toggleDetails(c, card));
+    listEl.appendChild(card);
+  });
+}
+
+function toggleDetails(customer, card) {
+  const next = card.nextElementSibling;
+  if (next && next.classList.contains('details')) {
+    next.remove();
+    return;
+  }
+  document.querySelectorAll('.details').forEach(el => el.remove());
+
+  const details = document.createElement('div');
+  details.className = 'details';
+  details.innerHTML = `<p><strong>Total Given:</strong> ₹${customer.amount} &nbsp; <strong>Interest/Mo:</strong> ₹${customer.interestAmount}</p><hr>`;
+
+  generateMonths(customer).forEach(month => {
+    const row = document.createElement('div');
+    row.className = 'month-row';
+
+    const pays = customer.payments?.filter(p => p.monthKey === month.key) || [];
+    const paidTotal = pays.reduce((a, b) => a + b.amount, 0);
+    const rem = customer.interestAmount - paidTotal;
+
+    let text = `${month.label}\tDue: ${month.dueDate}\tRemaining: ₹${rem}\n`;
+    row.textContent = text;
+
+    pays.forEach((p, index) => {
+      const entry = document.createElement('div');
+      entry.className = 'payment-entry';
+      entry.innerHTML = `Paid ₹${p.amount} on ${formatDate(p.date)} `;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => editPayment(customer.name, month.key, index));
+
+      entry.appendChild(editBtn);
+      row.appendChild(entry);
+    });
+
+    if (rem <= 0) {
+      row.classList.add('paid');
+    } else {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'input-amount';
+      input.placeholder = '₹';
+      input.min = 1;
+      input.max = rem;
+
+      input.addEventListener('input', () => {
+        if (parseInt(input.value) > rem) {
+          input.value = rem;
+        }
+      });
+
+      const btn = document.createElement('button');
+      btn.className = 'pay-btn';
+      btn.textContent = 'Pay';
+      btn.addEventListener('click', () => {
+        const amt = parseInt(input.value);
+        if (!amt || amt < 1 || amt > rem) {
+          alert(`Enter a valid amount between 1 and ₹${rem}`);
+          return;
+        }
+        pay(customer.name, month.key, amt);
+      });
+
+      row.appendChild(input);
+      row.appendChild(btn);
+    }
+
+    details.appendChild(row);
+  });
+
+  card.insertAdjacentElement('afterend', details);
+}
+
+function editPayment(name, monthKey, paymentIndex) {
+  const customer = customers.find(x => x.name === name);
+  const payment = customer.payments.filter(p => p.monthKey === monthKey)[paymentIndex];
+
+  const newAmount = prompt('Enter new amount:', payment.amount);
+  if (newAmount !== null && !isNaN(newAmount) && newAmount > 0) {
+    payment.amount = parseInt(newAmount);
+    payment.date = new Date().toISOString();
+    localStorage.setItem('customers_v3', JSON.stringify(customers));
+    alert('Payment updated!');
+    render();
+  }
+}
+
+function pay(name, monthKey, amount) {
+  const c = customers.find(x => x.name === name);
+  c.payments = c.payments || [];
+  c.payments.push({ monthKey, amount, date: new Date().toISOString() });
+  localStorage.setItem('customers_v3', JSON.stringify(customers));
+  alert(`₹${amount} paid!`);
+  render();
+}
+
+function generateMonths(customer) {
+  const arr = [];
+  const start = new Date(customer.givenDate);
+  const now = new Date();
+  while (start <= now) {
+    const key = `${start.getMonth() + 1}-${start.getFullYear()}`;
+    const due = new Date(start);
+    due.setDate(5);
+    arr.push({
+      label: start.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      key, dueDate: formatDate(due)
+    });
+    start.setMonth(start.getMonth() + 1);
+  }
+  return arr;
+}
+
+function formatDate(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-GB');
+}
+
+render();
+</script>
+
+</body>
+</html>

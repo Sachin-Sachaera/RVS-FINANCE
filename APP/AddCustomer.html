@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Customer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            position: relative;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .home-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            text-decoration: none;
+            font-size: 24px;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="Home.html" class="home-link" title="Back to Home">🏠</a>
+
+    <h1>Add New Customer</h1>
+
+    <form id="customerForm">
+        <input type="text" id="name" placeholder="Customer Name" required>
+        <input type="number" id="amount" placeholder="Amount Given" required>
+        <input type="number" id="interestPercent" placeholder="Interest Percentage (%)" required>
+        <input type="number" id="interestAmount" placeholder="Interest Amount" readonly>
+        <input type="text" id="details" placeholder="Details">
+        <input type="text" id="aadhar" placeholder="Aadhar Number">
+        <input type="text" id="mobile" placeholder="Mobile Number">
+        <input type="text" id="place" placeholder="Place">
+        <input type="date" id="givenDate">
+        <button type="submit">Add Customer</button>
+    </form>
+
+    <script>
+        const amountInput = document.getElementById('amount');
+        const interestPercentInput = document.getElementById('interestPercent');
+        const interestAmountInput = document.getElementById('interestAmount');
+
+        function calculateInterest() {
+            const amount = parseFloat(amountInput.value) || 0;
+            const percent = parseFloat(interestPercentInput.value) || 0;
+            interestAmountInput.value = ((amount * percent) / 100).toFixed(2);
+        }
+
+        amountInput.addEventListener('input', calculateInterest);
+        interestPercentInput.addEventListener('input', calculateInterest);
+
+        document.getElementById('customerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const customer = {
+                name: document.getElementById('name').value,
+                amount: parseFloat(amountInput.value),
+                interestPercent: parseFloat(interestPercentInput.value),
+                interestAmount: parseFloat(interestAmountInput.value),
+                details: document.getElementById('details').value,
+                aadhar: document.getElementById('aadhar').value,
+                mobile: document.getElementById('mobile').value,
+                place: document.getElementById('place').value,
+                givenDate: document.getElementById('givenDate').value,
+                payments: []
+            };
+
+            let customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+            customers.push(customer);
+            localStorage.setItem('customers_v3', JSON.stringify(customers));
+
+            alert('Customer added successfully!');
+            this.reset();
+            interestAmountInput.value = '';
+        });
+    </script>
+
+</body>
+</html>

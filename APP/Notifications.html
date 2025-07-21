@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interest Payment Notifications</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+        h1 { text-align: center; color: #dc3545; }
+        .home-link { font-size: 24px; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background: #007bff;
+            color: white;
+        }
+        .due-soon { color: orange; font-weight: bold; }
+        .overdue { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>🔔 Interest Payment Notifications</h1>
+<a href="Home.html" class="home-link">🏠 Home</a>
+
+<div id="notifications"></div>
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const today = new Date();
+let html = '';
+
+customers.forEach(customer => {
+    if (customer.givenDate && customer.interestAmount) {
+        const pendingMonths = getPendingMonths(customer);
+
+        if (pendingMonths.length > 0) {
+            html += `<h3>${customer.name} - Total Remaining: ₹${pendingMonths.reduce((sum, month) => sum + month.remaining, 0)}</h3>`;
+            html += `<table>
+                        <tr>
+                            <th>Month</th>
+                            <th>Due Date</th>
+                            <th>Remaining Amount</th>
+                            <th>Status</th>
+                        </tr>`;
+
+            pendingMonths.forEach(month => {
+                const daysLeft = Math.ceil((month.dueDate - today) / (1000 * 60 * 60 * 24));
+                let status = '';
+                if (daysLeft < 0) status = '<span class="overdue">Overdue</span>';
+                else if (daysLeft <= 10) status = '<span class="due-soon">Due Soon</span>';
+                else status = 'Upcoming';
+
+                html += `
+                    <tr>
+                        <td>${month.label}</td>
+                        <td>${formatDate(month.dueDate)}</td>
+                        <td>₹${month.remaining}</td>
+                        <td>${status}</td>
+                    </tr>`;
+            });
+
+            html += `</table>`;
+        }
+    }
+});
+
+if (html === '') {
+    html = '<p>✅ No pending payments or due amounts.</p>';
+}
+
+document.getElementById('notifications').innerHTML = html;
+
+
+// Helper functions
+function getPendingMonths(customer) {
+    const startDate = new Date(customer.givenDate);
+    const now = new Date();
+    const months = [];
+
+    while (startDate <= now) {
+        const key = `${startDate.getMonth() + 1}-${startDate.getFullYear()}`;
+        const label = startDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        const payments = (customer.payments || []).filter(p => p.monthKey === key);
+        const paidTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+        const remaining = customer.interestAmount - paidTotal;
+
+        if (remaining > 0) {
+            const dueDate = new Date(startDate);
+            dueDate.setDate(new Date(customer.givenDate).getDate());
+            months.push({ key, label, remaining, dueDate });
+        }
+
+        startDate.setMonth(startDate.getMonth() + 1);
+    }
+
+    return months;
+}
+
+function formatDate(date) {
+    return new Date(date).toLocaleDateString('en-GB');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Payments Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+        .home-link { position: fixed; top: 10px; left: 10px; font-size: 24px; text-decoration: none; color: #007bff; }
+        h1 { text-align: center; margin-top: 40px; }
+        .customer-card { background: white; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 15px; }
+        .customer-name { font-weight: bold; color: #333; margin-bottom: 10px; font-size: 20px; }
+        .month-box { display: inline-block; margin: 5px; padding: 12px; border-radius: 8px; color: white; font-weight: bold; text-align: center; width: 120px; background-color: orange; cursor: pointer; }
+        .month-box.paid { background-color: #28a745; }
+        .history-details { margin-top: 8px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .payment-entry { border-bottom: 1px solid #ddd; margin-bottom: 5px; padding-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<a href="Home.html" class="home-link">🏠</a>
+<h1>✅ HISTORY</h1>
+<div id="paidPaymentsList"></div>
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const paidPaymentsList = document.getElementById('paidPaymentsList');
+
+function renderPaidPayments() {
+    paidPaymentsList.innerHTML = '';
+
+    customers.forEach(customer => {
+        if (customer.payments && customer.payments.length > 0) {
+            const totalPaidByCustomer = customer.payments.reduce((sum, p) => sum + p.amount, 0);
+
+            const card = document.createElement('div');
+            card.className = 'customer-card';
+            card.innerHTML = `
+                <div class="customer-name">${customer.name} - Paid: ₹${totalPaidByCustomer.toLocaleString('en-IN')}</div>
+                <div id="months-${customer.name}"></div>
+            `;
+            paidPaymentsList.appendChild(card);
+
+            const container = card.querySelector(`#months-${customer.name}`);
+            const uniqueMonths = getUniqueMonths(customer.payments);
+
+            uniqueMonths.forEach(monthKey => {
+                const monthPayments = customer.payments.filter(p => p.monthKey === monthKey);
+                const totalPaid = monthPayments.reduce((sum, p) => sum + p.amount, 0);
+
+                const monthBox = document.createElement('div');
+                monthBox.className = 'month-box';
+                if (totalPaid >= customer.interestAmount) monthBox.classList.add('paid');
+
+                monthBox.textContent = formatMonthKey(monthKey);
+                monthBox.addEventListener('click', () => showPaymentDetails(container, monthKey, monthPayments, customer.interestAmount));
+
+                container.appendChild(monthBox);
+            });
+        }
+    });
+}
+
+function getUniqueMonths(payments) {
+    return [...new Set(payments.map(p => p.monthKey))];
+}
+
+function showPaymentDetails(container, monthKey, payments, interestAmount) {
+    container.querySelectorAll('.history-details').forEach(el => el.remove());
+
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRemaining = Math.max(interestAmount - totalPaid, 0);
+
+    const historyDiv = document.createElement('div');
+    historyDiv.className = 'history-details';
+    historyDiv.innerHTML = `<strong>Payment History for ${formatMonthKey(monthKey)}</strong><br>`;
+    historyDiv.innerHTML += `<p>Total Amount: ₹${interestAmount}</p>`;
+    if (totalRemaining > 0) {
+        historyDiv.innerHTML += `<p>Remaining Amount: ₹${totalRemaining}</p>`;
+    }
+
+    payments.forEach(payment => {
+        const entry = document.createElement('div');
+        entry.className = 'payment-entry';
+        entry.innerHTML = `
+            <p>Amount Paid: ₹${payment.amount}</p>
+            ${payment.remaining > 0 ? `<p>Remaining on Payment: ₹${payment.remaining}</p>` : ''}
+            <p>Paid Date: ${formatDate(payment.date)}</p>
+        `;
+        historyDiv.appendChild(entry);
+    });
+
+    container.appendChild(historyDiv);
+}
+
+function formatMonthKey(monthKey) {
+    const [month, year] = monthKey.split('-').map(Number);
+    return new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-GB');
+}
+
+renderPaidPayments();
+</script>
+
+</body>
+</html>
