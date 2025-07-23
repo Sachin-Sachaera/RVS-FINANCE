@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Manager Overview</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>📊 RVS Finance Overview</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,10 +12,13 @@
             padding: 20px;
             text-align: center;
         }
+
         .menu {
             margin-bottom: 30px;
         }
-        .menu a, .menu button {
+
+        .menu a,
+        .menu button {
             display: inline-block;
             background: #007bff;
             color: white;
@@ -28,35 +31,48 @@
             font-weight: bold;
             font-size: 16px;
         }
-        .menu a:hover, .menu button:hover {
+
+        .menu a:hover,
+        .menu button:hover {
             background: #0056b3;
         }
+
         .header {
             font-size: 28px;
             font-weight: bold;
             margin-bottom: 20px;
         }
+
         .overview-table {
             width: 100%;
             max-width: 600px;
             margin: 0 auto;
             border-collapse: collapse;
             background: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-        .overview-table th, .overview-table td {
+
+        .overview-table th,
+        .overview-table td {
             border: 1px solid #ddd;
             padding: 15px 20px;
             text-align: left;
             font-size: 20px;
         }
+
         .overview-table th {
             background-color: #007bff;
             color: white;
         }
+
         .overview-table td.value {
             font-weight: bold;
             color: #007bff;
+        }
+
+        input[type="file"] {
+            display: inline-block;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -72,7 +88,7 @@
         <input type="file" id="importFile" accept=".json" onchange="importData(event)">
     </div>
 
-    <div class="header">📊 Finance Manager Overview</div>
+    <div class="header">📊 RVS Finance Overview</div>
 
     <table class="overview-table">
         <tr>
@@ -81,11 +97,11 @@
         </tr>
         <tr>
             <td>Total Customers</td>
-            <td class="value" id="totalCustomers">2</td>
+            <td class="value" id="totalCustomers">0</td>
         </tr>
         <tr>
             <td>Total Amount Given</td>
-            <td class="value">₹<span id="totalAmountGiven">1,20,000</span></td>
+            <td class="value">₹<span id="totalAmountGiven">0</span></td>
         </tr>
     </table>
 
@@ -107,7 +123,7 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const data = JSON.parse(e.target.result);
                     if (Array.isArray(data)) {
@@ -123,6 +139,20 @@
             };
             reader.readAsText(file);
         }
+
+        function loadData() {
+            const raw = localStorage.getItem('customers_v3') || '[]';
+            try {
+                const customers = JSON.parse(raw);
+                const total = customers.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+                document.getElementById("totalCustomers").textContent = customers.length;
+                document.getElementById("totalAmountGiven").textContent = total.toLocaleString("en-IN");
+            } catch {
+                console.warn("Invalid customer data in localStorage.");
+            }
+        }
+
+        loadData();
     </script>
 
 </body>
