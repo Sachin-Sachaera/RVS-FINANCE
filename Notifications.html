@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interest Payment Notifications</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f0f0; margin:0; padding:0; }
+    header {
+      width: 100%;
+      background-color: #007bff;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      position: relative;
+      animation: fadeInHeader 1s ease-in-out;
+    }
+    @keyframes fadeInHeader {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .home-link { position: absolute; left: 15px; font-size: 30px; text-decoration: none; color: white; }
+    .html-name { font-size: 24px; font-weight: bold; text-align: center; }
+    h1 { text-align: center; color: #dc3545; margin-top:20px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th { background: #007bff; color: white; }
+    .due-soon { color: orange; font-weight: bold; }
+    .overdue { color: red; font-weight: bold; }
+    .skipped { color: gray; font-weight: bold; }
+    .summary-table {
+      margin: 20px auto;
+      max-width: 600px;
+    }
+    .summary-table td button {
+      padding: 6px 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Modal Styling */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      max-width: 800px;
+      width: 90%;
+      border-radius: 10px;
+      max-height: 90%;
+      overflow-y: auto;
+      position: relative;
+    }
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="Home.html" class="home-link">🏠</a>
+  <div class="html-name">RVS Finance - Bending</div>
+</header>
+
+<div id="notifications"></div>
+
+<!-- Summary Table -->
+<table class="summary-table" id="summaryTable">
+  <tr>
+    <th>Customer</th>
+    <th>Total Remaining</th>
+    <th>Action</th>
+  </tr>
+</table>
+
+<!-- Modal -->
+<div id="customerModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal()">❌</span>
+    <div id="modalDetails"></div>
+  </div>
+</div>
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const today = new Date();
+let modal = document.getElementById("customerModal");
+let summaryTable = document.getElementById("summaryTable");
+
+customers.forEach((customer, index) => {
+  if (customer.givenDate && customer.interestAmount) {
+    const totalRemaining = calculateRemaining(customer);
+    if (totalRemaining > 0) {
+      const row = summaryTable.insertRow();
+      row.insertCell(0).innerText = customer.name;
+      row.insertCell(1).innerText = `₹${totalRemaining.toLocaleString("en-IN")}`;
+      const btnCell = row.insertCell(2);
+      const btn = document.createElement("button");
+      btn.innerText = "View";
+      btn.onclick = () => openModal(index);
+      btnCell.appendChild(btn);
+    }
+  }
+});
+
+function openModal(customerIndex) {
+  const customer = customers[customerIndex];
+  const months = generateMonths(customer);
+  let html = `<h3>${customer.name} - Remaining: ₹${calculateRemaining(customer).toLocaleString('en-IN')}</h3>`;
+  let content = '';
+
+  months.forEach(month => {
+    // Skip if the month is marked as skipped
+    if ((customer.skippedMonths || []).includes(month.key)) return;
+
+    const payments = (customer.payments || []).filter(p => p.monthKey === month.key);
+    const paidTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+    const remaining = customer.interestAmount - paidTotal;
+
+    if (remaining > 0) {
+      const daysLeft = Math.ceil((month.dueDateObj - today) / (1000 * 60 * 60 * 24));
+      let status = '';
+      if (daysLeft < 0) status = '<span class="overdue">Overdue</span>';
+      else if (daysLeft <= 10) status = '<span class="due-soon">Due Soon</span>';
+      else status = 'Upcoming';
+
+      content += `
+      <tr>
+        <td>${month.label}</td>
+        <td>${month.dueDate}</td>
+        <td>₹${remaining.toLocaleString('en-IN')}</td>
+        <td>${status}</td>
+      </tr>`;
+    }
+  });
+
+  if (content === '') {
+    content = `<tr><td colspan="4">✅ No dues</td></tr>`;
+  }
+
+  html += `
+    <table>
+      <tr>
+        <th>Month</th>
+        <th>Due Date</th>
+        <th>Remaining Amount</th>
+        <th>Status</th>
+      </tr>
+      ${content}
+    </table>`;
+
+  document.getElementById("modalDetails").innerHTML = html;
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  modal.style.display = "none";
+}
+
+function generateMonths(customer) {
+  const arr = [];
+  const startDate = new Date(customer.givenDate);
+  const givenDay = startDate.getDate();
+  const now = new Date();
+
+  let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while (current <= now) {
+    const key = `${current.getMonth() + 1}-${current.getFullYear()}`;
+    let due = new Date(current.getFullYear(), current.getMonth(), givenDay);
+    if (due.getMonth() !== current.getMonth()) {
+      due = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+    }
+
+    arr.push({
+      label: current.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      key,
+      dueDate: formatDate(due),
+      dueDateObj: due
+    });
+
+    current.setMonth(current.getMonth() + 1);
+  }
+  return arr;
+}
+
+function calculateRemaining(customer) {
+  let total = 0;
+  generateMonths(customer).forEach(month => {
+    if (!(customer.skippedMonths || []).includes(month.key)) {
+      const payments = (customer.payments || []).filter(p => p.monthKey === month.key);
+      const paidTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+      const remaining = customer.interestAmount - paidTotal;
+      if (remaining > 0) total += remaining;
+    }
+  });
+  return total;
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleDateString('en-GB');
+}
+</script>
+
+</body>
+</html>

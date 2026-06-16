@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer Overview</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f0f0; margin: 0; }
+    header {
+      background-color: #007bff; color: white; padding: 15px 20px;
+      font-size: 20px; font-weight: bold;
+      display: flex; align-items: center; justify-content: space-between;
+      position: relative;
+    }
+    .title-center { position: absolute; left: 50%; transform: translateX(-50%); }
+    .home-link {
+      text-decoration: none; color: white; font-size: 28px;
+      display: flex; align-items: center; padding: 0 10px;
+    }
+    .export-btn {
+      background: white; color: #007bff; border: 2px solid white;
+      border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer;
+    }
+    .grid-container {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px; padding: 20px;
+    }
+    .customer-card {
+      background: white; border: 2px solid #007bff;
+      border-radius: 8px; padding: 15px;
+      text-align: center; cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .customer-name { font-weight: bold; color: #007bff; font-size: 18px; }
+    .customer-amount { color: #333; font-size: 16px; }
+    .modal {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+      justify-content: center; align-items: center; z-index: 10;
+    }
+    .modal-content {
+      background: white; padding: 20px; border-radius: 10px;
+      width: 90%; max-width: 500px; position: relative;
+    }
+    .close-btn {
+      background-color: red; color: white; border: none;
+      font-size: 18px; font-weight: bold; padding: 2px 8px;
+      border-radius: 50%; cursor: pointer;
+      position: absolute; top: 10px; right: 10px;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    table, th, td { border: 1px solid #ccc; }
+    td { padding: 8px; }
+    input[type="text"], input[type="number"], input[type="date"] {
+      width: 100%; border: none; background: transparent;
+    }
+    .actions { text-align: right; margin-top: 10px; }
+    .edit-btn, .delete-btn, .save-btn {
+      background-color: #007bff; color: white; border: none;
+      padding: 8px 14px; margin: 4px; border-radius: 6px; cursor: pointer;
+    }
+    .delete-btn { background-color: #dc3545; }
+    .save-btn { background-color: #28a745; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="Home.html" class="home-link">🏠</a>
+    <div class="title-center">RVS Finance - Customers</div>
+    <button class="export-btn" onclick="exportToExcel()">Export to Excel</button>
+  </header>
+
+  <div class="grid-container" id="customerGrid"></div>
+
+  <!-- Modal -->
+  <div class="modal" id="detailsModal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal()">X</button>
+      <h3 id="modalName"></h3>
+      <table id="modalTable"></table>
+      <div class="actions">
+        <button class="edit-btn" onclick="enableEdit()">Edit</button>
+        <button class="save-btn" onclick="saveEdit()" style="display:none;">Save</button>
+        <button class="delete-btn" onclick="deleteCustomer()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  let customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+  let selectedIndex = null;
+
+  function renderCustomers() {
+    const grid = document.getElementById('customerGrid');
+    grid.innerHTML = '';
+    customers.forEach((c, i) => {
+      const card = document.createElement('div');
+      card.className = 'customer-card';
+      card.innerHTML = `<div class="customer-name">${c.name}</div><div class="customer-amount">₹${parseFloat(c.amount || 0)}</div>`;
+      card.onclick = () => openModal(i);
+      grid.appendChild(card);
+    });
+  }
+
+  function openModal(index) {
+    selectedIndex = index;
+    const c = customers[index];
+    document.querySelector(".save-btn").style.display = "none";
+
+    const rows = [
+      ['Name', `<input id="name" type="text" value="${c.name || ''}" disabled>`],
+      ['Amount Given', `<input id="amt" type="number" value="${c.amount || ''}" disabled>`],
+      ['Interest %', `<input id="int%" type="number" value="${c.interestPercent || ''}" disabled>`],
+      ['Monthly Interest', `<input id="intamt" type="number" value="${c.interestAmount || ''}" disabled>`],
+      ['Aadhar', `<input type="text" maxlength="12" pattern="\\d*" value="${c.aadhar || ''}" disabled>`],
+      ['Mobile', `<input type="text" maxlength="10" pattern="\\d*" value="${c.mobile || ''}" disabled>`],
+      ['Place', `<input type="text" value="${c.place || ''}" disabled>`],
+      ['Date Given', `<input type="date" value="${c.givenDate || ''}" disabled>`],
+      ['Details', `<input type="text" value="${c.details || ''}" disabled>`]
+    ];
+
+    document.getElementById('modalTable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+    document.getElementById('modalName').textContent = c.name;
+    document.getElementById('detailsModal').style.display = 'flex';
+  }
+
+  function enableEdit() {
+    const inputs = document.querySelectorAll('#modalTable input');
+    inputs.forEach(input => input.disabled = false);
+    document.querySelector(".save-btn").style.display = "inline-block";
+
+    const amount = document.getElementById('amt');
+    const percent = document.getElementById('int%');
+    const interest = document.getElementById('intamt');
+
+    function calcInterest() {
+      if (amount.value && percent.value) {
+        interest.value = ((parseFloat(amount.value) * parseFloat(percent.value)) / 100).toFixed(2);
+      }
+    }
+
+    amount.addEventListener('input', calcInterest);
+    percent.addEventListener('input', calcInterest);
+  }
+
+  function saveEdit() {
+    const inputs = document.querySelectorAll('#modalTable input');
+    const old = customers[selectedIndex];
+    const updated = {
+      name: inputs[0].value,
+      amount: inputs[1].value,
+      interestPercent: inputs[2].value,
+      interestAmount: inputs[3].value,
+      aadhar: inputs[4].value,
+      mobile: inputs[5].value,
+      place: inputs[6].value,
+      givenDate: inputs[7].value,
+      details: inputs[8].value
+    };
+
+    const changes = [];
+    for (const key in updated) {
+      const oldVal = (old[key] ?? '').toString().trim();
+      const newVal = updated[key].toString().trim();
+      if (oldVal !== newVal) {
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+        changes.push(`✏️ ${label} changed from ${oldVal || '""'} to ${newVal || '""'}`);
+      }
+    }
+
+    if (changes.length > 0) {
+      Object.assign(customers[selectedIndex], updated);
+      localStorage.setItem('customers_v3', JSON.stringify(customers));
+      changes.forEach(change => logAction(change, updated.name));
+      renderCustomers();
+    }
+
+    closeModal();
+  }
+
+  function deleteCustomer() {
+    const removed = customers.splice(selectedIndex, 1)[0];
+    localStorage.setItem('customers_v3', JSON.stringify(customers));
+    logAction(`🗑️ Deleted customer: ${removed.name}`, removed.name);
+    renderCustomers();
+    closeModal();
+  }
+
+  function closeModal() {
+    document.getElementById('detailsModal').style.display = 'none';
+  }
+
+  function exportToExcel() {
+    const data = customers.map(c => ({
+      Name: c.name,
+      Amount: c.amount,
+      'Interest %': c.interestPercent || '',
+      'Monthly Interest': c.interestAmount || '',
+      Aadhar: c.aadhar || '',
+      Mobile: c.mobile || '',
+      Place: c.place || '',
+      'Given Date': c.givenDate || '',
+      Details: c.details || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Customers");
+    XLSX.writeFile(wb, "RVS_Customers.xlsx");
+    logAction("📁 Exported customers to Excel", "-");
+  }
+
+  function getFormattedDate() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `📅 ${dd}/${mm}/${yyyy}, ${time}`;
+  }
+
+  function logAction(msg, customerName = '-') {
+    const logs = JSON.parse(localStorage.getItem('record_logs') || '[]');
+    logs.push({
+      msg,
+      time: getFormattedDate(),
+      customer: customerName
+    });
+    localStorage.setItem('record_logs', JSON.stringify(logs));
+  }
+
+  renderCustomers();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📊RVS Finance</title>
+  <style>
+    /* All your original styles are retained */
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+    }
+
+    header {
+      background: #007bff;
+      color: white;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .top-actions button, .top-actions label {
+      background: white;
+      color: #007bff;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .main {
+      padding: 15px;
+      padding-bottom: 100px;
+    }
+
+    .top-buttons {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .top-buttons button {
+      padding: 8px 15px;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 10px;
+      border: none;
+    }
+    .add-customer-btn {
+      background: #28a745;
+      color: white;
+    }
+
+    .notify-btn {
+      background: #ffc107;
+      color: black;
+    }
+
+    .overview-table {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    .overview-table th, .overview-table td {
+      border: 1px solid #ddd;
+      padding: 15px 20px;
+      text-align: left;
+      font-size: 18px;
+    }
+
+    .overview-table th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .overview-table td.value {
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .actions button {
+      margin: 5px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 80%;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 20px;
+      cursor: pointer;
+      color: #333;
+    }
+
+    .dues-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .dues-table th, .dues-table td {
+      border: 1px solid #ccc;
+      padding: 12px;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .dues-table th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .dues-table td {
+      background-color: #f9f9f9;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background-color: #ffffff;
+      border-top: 1px solid #ccc;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+      padding: 0;
+    }
+
+    .nav-item {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      color: #007bff;
+      text-decoration: none;
+      font-size: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .nav-item span {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .nav-item small {
+      font-size: 11px;
+      color: #444;
+      margin-top: 2px;
+    }
+
+    .nav-item:hover {
+      background-color: #f0f8ff;
+    }
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title">📊 RVS Finance</div>
+    <div class="top-actions">
+      <button onclick="exportData()">📤 Export</button>
+      <label>
+        📥 Import
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      </label>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="top-buttons">
+      <a href="AddCustomer.html"><button class="add-customer-btn">➕ Add Customer</button></a>
+      <a href="Notifications.html"><button class="notify-btn">🔔 Notify</button></a>
+    </div>
+
+    <table class="overview-table">
+      <tr>
+        <th>Metric</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <td>Total Customers</td>
+        <td class="value" id="totalCustomers">0</td>
+      </tr>
+      <tr>
+        <td>Total Amount Given</td>
+        <td class="value">₹<span id="totalAmountGiven">0</span></td>
+      </tr>
+    </table>
+
+    <div class="actions">
+      <button onclick="openModal()">📅 Show Current Month Due</button>
+    </div>
+  </div>
+
+  <div id="dueModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal()">❌</span>
+      <h2>📅 Current Month's Due List</h2>
+      <table class="dues-table">
+        <thead>
+          <tr>
+            <th>Customer Name</th>
+            <th>Due Date</th>
+            <th>Current Month Due</th>
+          </tr>
+        </thead>
+        <tbody id="currentMonthDueList"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ✅ Bottom Navigation Menu -->
+  <div class="bottom-nav">
+    <a href="CustomerDetails.html" class="nav-item">
+      <span>👥</span>
+      <small>Customers</small>
+    </a>
+    <a href="IncompletePayments.html" class="nav-item">
+      <span>📅</span>
+      <small>Payment</small>
+    </a>
+    <a href="PaymentHistory.html" class="nav-item">
+      <span>🧾</span>
+      <small>History</small>
+    </a>
+    <a href="Record-log.html" class="nav-item">
+      <span>📑</span>
+      <small>Records</small>
+    </a>
+  </div>
+
+  <script>
+    // ✅ Log Activity
+    function logActivity(actionText) {
+      const logs = JSON.parse(localStorage.getItem('activity_logs') || '[]');
+      logs.push({
+        date: new Date().toLocaleString(),
+        action: actionText
+      });
+      localStorage.setItem('activity_logs', JSON.stringify(logs));
+    }
+
+    let customers = JSON.parse(localStorage.getItem('customers_v3') || '[]');
+
+    function updateOverview() {
+      document.getElementById("totalCustomers").innerText = customers.length;
+      const totalAmount = customers.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+      document.getElementById("totalAmountGiven").innerText = totalAmount.toLocaleString('en-IN');
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(customers)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'finance_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (Array.isArray(data)) {
+            localStorage.setItem('customers_v3', JSON.stringify(data));
+            customers = data;
+            updateOverview();
+            alert('✅ Data imported successfully!');
+            logActivity("📥 Imported customer data");
+          } else {
+            alert('❌ Invalid data format.');
+          }
+        } catch {
+          alert('❌ Invalid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function openModal() {
+      renderCurrentMonthDues();
+      document.getElementById('dueModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('dueModal').style.display = 'none';
+    }
+
+    function renderCurrentMonthDues() {
+      const tbody = document.getElementById('currentMonthDueList');
+      tbody.innerHTML = '';
+
+      const today = new Date();
+      const currentMonthKey = `${today.getMonth() + 1}-${today.getFullYear()}`;
+      const dues = [];
+
+      customers.forEach(customer => {
+        if (!customer.givenDate || !customer.interestAmount) return;
+
+        const payments = customer.payments || [];
+        const removedMonths = customer.removedMonths || [];
+
+        const currentPayments = payments.filter(p => p.monthKey === currentMonthKey);
+        const currentMonthPaid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
+        const currentRemaining = customer.interestAmount - currentMonthPaid;
+
+        if (removedMonths.includes(currentMonthKey)) return;
+
+        if (currentRemaining > 0) {
+          const dueDate = getDueDateForCustomer(customer, today);
+          dues.push({
+            name: customer.name,
+            dueDate,
+            currentMonthDue: currentRemaining
+          });
+        }
+      });
+
+      dues.sort((a, b) => {
+        const [dayA, monthA, yearA] = a.dueDate.split('/').map(Number);
+        const [dayB, monthB, yearB] = b.dueDate.split('/').map(Number);
+        return new Date(yearA, monthA - 1, dayA) - new Date(yearB, monthB - 1, dayB);
+      });
+
+      if (dues.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3">✅ No dues for this month!</td></tr>';
+        return;
+      }
+
+      dues.forEach(d => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${d.name}</td>
+            <td>${d.dueDate}</td>
+            <td>₹${d.currentMonthDue.toLocaleString('en-IN')}</td>
+          </tr>
+        `;
+      });
+    }
+
+    function getDueDateForCustomer(customer, today) {
+      const givenDate = new Date(customer.givenDate);
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const day = givenDate.getDate();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const adjustedDay = Math.min(day, lastDay);
+      const dueDate = new Date(year, month, adjustedDay);
+      return dueDate.toLocaleDateString('en-GB');
+    }
+
+    updateOverview();
+  </script>
+
+</body>
+</html>

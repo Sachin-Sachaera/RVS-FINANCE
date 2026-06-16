@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Payments - Edit, Delete, Skip, Add Back</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #007bff;
+      color: white;
+      text-align: center;
+      padding: 12px;
+      font-size: 24px;
+      position: relative;
+    }
+    .home-link {
+      position: absolute;
+      left: 15px;
+      color: white;
+      text-decoration: none;
+      font-size: 24px;
+      top: 12px;
+    }
+    h1 {
+      text-align: center;
+      color: #dc3545;
+    }
+    .grid-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 10px;
+    }
+    .customer-card {
+      background: #fff;
+      margin: 10px;
+      padding: 15px;
+      border-left: 5px solid #dc3545;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      cursor: pointer;
+      width: 30%;
+      min-width: 200px;
+      text-align: center;
+    }
+    @media (max-width: 768px) {
+      .customer-card { width: 45%; }
+    }
+    @media (max-width: 480px) {
+      .customer-card { width: 90%; }
+    }
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      max-height: 80vh;
+      overflow-y: auto;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 800px;
+      position: relative;
+    }
+    .close-btn {
+      position: absolute;
+      right: 20px;
+      top: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 18px;
+      color: red;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 40px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .paid-row {
+      background-color: #a5d6a7;
+    }
+    .skipped-row {
+      background-color: #ccc;
+      text-decoration: line-through;
+    }
+    .btn {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 2px;
+    }
+    input[type="number"], input[type="date"] {
+      padding: 4px;
+      margin: 2px;
+      width: 100px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="Home.html" class="home-link">🏠</a> RVS Finance - Incomplete Payments
+</header>
+
+<div class="grid-container" id="incompletePaymentsList"></div>
+
+<!-- Modal Dialog -->
+<div id="modal" class="modal" style="display: none;">
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
+<!-- All existing HTML and styles stay the same -->
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const listEl = document.getElementById('incompletePaymentsList');
+const modal = document.getElementById('modal');
+const modalContent = document.getElementById('modalContent');
+
+function render() {
+  listEl.innerHTML = '';
+  customers.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'customer-card';
+    card.textContent = c.name;
+    card.addEventListener('click', () => openDialog(c));
+    listEl.appendChild(card);
+  });
+}
+
+function openDialog(customer) {
+  modalContent.innerHTML = `
+    <span class="close-btn" onclick="closeDialog()">✖</span>
+    <h2>${customer.name}</h2>
+    <p><strong>Total Given:</strong> ₹${customer.amount} &nbsp;&nbsp; <strong>Interest/Month:</strong> ₹${customer.interestAmount}</p>
+    <table>
+      <tr><th>Month</th><th>Payments</th><th>Remaining</th><th>Actions</th></tr>
+    </table>
+  `;
+
+  const table = modalContent.querySelector('table');
+  customer.skippedMonths = customer.skippedMonths || [];
+
+  generateMonths(customer).forEach(month => {
+    const tr = document.createElement('tr');
+    const monthKey = month.key;
+
+    let payments = customer.payments?.filter(p => p.monthKey === monthKey) || [];
+    let paidTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+    let remaining = customer.interestAmount - paidTotal;
+
+    const isSkipped = customer.skippedMonths.includes(monthKey);
+    const isPaid = remaining <= 0 && !isSkipped;
+
+    if (isSkipped) tr.classList.add('skipped-row');
+    else if (isPaid) tr.classList.add('paid-row');
+
+    const tdMonth = document.createElement('td');
+    tdMonth.textContent = month.label;
+
+    const tdPayments = document.createElement('td');
+    payments.forEach((p, idx) => {
+      const rowId = `edit-${customer.name}-${monthKey}-${idx}`;
+      tdPayments.innerHTML += `
+        <div id="${rowId}">
+          ₹${p.amount} (${formatDate(p.date)})
+          <span class="edit-controls">
+            <button class="btn" style="background:#007bff" onclick="editPayment('${customer.name}','${monthKey}',${idx})">Edit</button>
+            <button class="btn" style="background:#dc3545" onclick="deletePayment('${customer.name}','${monthKey}',${idx})">Delete</button>
+          </span>
+        </div>
+      `;
+    });
+
+    const tdRemaining = document.createElement('td');
+    tdRemaining.textContent = `₹${isSkipped ? 0 : remaining}`;
+
+    const tdActions = document.createElement('td');
+    if (isSkipped) {
+      tdActions.innerHTML = `<button class="btn" style="background:#28a745" onclick="unskipMonth('${customer.name}','${monthKey}')">Add Back</button>`;
+    } else {
+      if (remaining > 0) {
+        tdActions.innerHTML += `
+          <input type="number" id="amt-${monthKey}" placeholder="₹" min="1" max="${remaining}">
+          <button class="btn" style="background:#28a745" onclick="pay('${customer.name}','${monthKey}')">Pay</button>
+        `;
+      }
+      if (!isPaid) {
+        tdActions.innerHTML += `<button class="btn" style="background:#ff5722" onclick="skipMonth('${customer.name}','${monthKey}')">Skip</button>`;
+      }
+    }
+
+    tr.append(tdMonth, tdPayments, tdRemaining, tdActions);
+    table.appendChild(tr);
+  });
+
+  modal.style.display = 'flex';
+}
+
+function closeDialog() {
+  modal.style.display = 'none';
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-GB');
+}
+
+function formatMonthKey(monthKey) {
+  const [m, y] = monthKey.split('-').map(Number);
+  return new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function generateMonths(customer) {
+  const arr = [];
+  const start = new Date(customer.givenDate);
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  start.setDate(1);
+  while (start < end) {
+    const key = `${start.getMonth() + 1}-${start.getFullYear()}`;
+    arr.push({
+      label: start.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      key
+    });
+    start.setMonth(start.getMonth() + 1);
+  }
+  return arr;
+}
+
+function saveAndRerender(keepModalOpen = false, customerName = '') {
+  localStorage.setItem('customers_v3', JSON.stringify(customers));
+  render();
+  if (keepModalOpen) {
+    const customer = getCustomerByName(customerName);
+    openDialog(customer);
+  } else {
+    closeDialog();
+  }
+}
+
+function getCustomerByName(name) {
+  return customers.find(c => c.name === name);
+}
+
+function pay(name, monthKey) {
+  const input = document.getElementById(`amt-${monthKey}`);
+  const amt = parseInt(input.value);
+  if (!amt || amt < 1) return;
+
+  const c = getCustomerByName(name);
+  c.payments = c.payments || [];
+  c.payments.push({ monthKey, amount: amt, date: new Date().toISOString() });
+  logAction(`Paid by ${name}: ₹${amt} for ${formatMonthKey(monthKey)}`, name);
+  saveAndRerender(true, name);
+}
+
+function skipMonth(name, monthKey) {
+  const c = getCustomerByName(name);
+  c.skippedMonths.push(monthKey);
+  logAction(`Skipped ${formatMonthKey(monthKey)} for ${name}`, name);
+  saveAndRerender(true, name);
+}
+
+function unskipMonth(name, monthKey) {
+  const c = getCustomerByName(name);
+  c.skippedMonths = c.skippedMonths.filter(k => k !== monthKey);
+  logAction(`Added back payment for ${name}: ${formatMonthKey(monthKey)}`, name);
+  saveAndRerender(true, name);
+}
+
+function deletePayment(name, monthKey, idx) {
+  const c = getCustomerByName(name);
+  const payments = c.payments.filter(p => p.monthKey === monthKey);
+  const target = payments[idx];
+  const index = c.payments.indexOf(target);
+  if (index !== -1) {
+    logAction(`Deleted customer: ${name} - ₹${target.amount} for ${formatMonthKey(monthKey)}`, name);
+    c.payments.splice(index, 1);
+    saveAndRerender(true, name);
+  }
+}
+
+function editPayment(name, monthKey, idx) {
+  const c = getCustomerByName(name);
+  const p = c.payments.filter(p => p.monthKey === monthKey)[idx];
+  const id = `edit-${name}-${monthKey}-${idx}`;
+  const div = document.getElementById(id);
+
+  div.innerHTML = `
+    ₹<input type="number" id="edit-amt" value="${p.amount}" style="width:80px">
+    <input type="date" id="edit-date" value="${p.date.split('T')[0]}" style="width:130px">
+    <button class="btn" style="background:#28a745" onclick="saveEdit('${name}','${monthKey}',${idx})">Save</button>
+    <button class="btn" onclick="saveAndRerender(true, '${name}')">Cancel</button>
+  `;
+}
+
+function saveEdit(name, monthKey, idx) {
+  const newAmt = parseInt(document.getElementById('edit-amt').value);
+  const newDate = document.getElementById('edit-date').value;
+  if (!newAmt || !newDate) return;
+
+  const c = getCustomerByName(name);
+  const p = c.payments.filter(p => p.monthKey === monthKey)[idx];
+  const oldAmt = p.amount;
+  p.amount = newAmt;
+  p.date = new Date(newDate).toISOString();
+  logAction(`Edited payment for ${formatMonthKey(monthKey)} of ${name} from ₹${oldAmt} to ₹${newAmt}`, name);
+  saveAndRerender(true, name);
+}
+
+// ✅ Updated logAction to use `record_logs`
+function logAction(msg, customer = "-") {
+  const logs = JSON.parse(localStorage.getItem('record_logs') || '[]');
+  const time = new Date().toLocaleString('en-GB');
+  logs.push({ time, msg, customer });
+  localStorage.setItem('record_logs', JSON.stringify(logs));
+}
+
+render();
+</script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Payments Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; margin: 0; padding: 0; }
+        header {
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            position: relative;
+        }
+        .home-link { position: absolute; left: 15px; font-size: 30px; text-decoration: none; color: white; }
+        .company-name { font-size: 24px; font-weight: bold; text-align: center; }
+        h1 { text-align: center; margin: 20px 0; }
+        .customer-card { background: white; margin: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 15px; }
+        
+        .customer-name { 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 10px; 
+            font-size: 20px; 
+            cursor: pointer; 
+            display: inline-block;  
+            background-color: #f8f9fa; 
+            padding: 5px 10px; 
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .month-box { display: inline-block; margin: 5px; padding: 12px; border-radius: 8px; color: white; font-weight: bold; text-align: center; width: 140px; background-color: orange; cursor: pointer; }
+        .month-box.paid { background-color: #28a745; }
+        .month-box.skipped { background-color: #87CEEB; cursor: default; }
+        .history-details { margin-top: 8px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .payment-entry { border-bottom: 1px solid #ddd; margin-bottom: 5px; padding-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="Home.html" class="home-link">🏠</a>
+    <div class="company-name">RVS Finance - History</div>
+</header>
+<div id="paidPaymentsList"></div>
+
+<script>
+const customers = JSON.parse(localStorage.getItem('customers_v3')) || [];
+const paidPaymentsList = document.getElementById('paidPaymentsList');
+let activeCustomerDiv = null;
+
+function renderPaidPayments() {
+    paidPaymentsList.innerHTML = '';
+
+    customers.forEach(customer => {
+        if (customer.payments?.length > 0 || customer.removedMonths?.length > 0) {
+            const totalPaidByCustomer = (customer.payments || []).reduce((sum, p) => sum + p.amount, 0);
+
+            const card = document.createElement('div');
+            card.className = 'customer-card';
+            card.innerHTML = `
+                <div class="customer-name">${customer.name} - Paid: ₹${totalPaidByCustomer.toLocaleString('en-IN')}</div>
+                <div class="customer-details" style="display:none;"></div>
+            `;
+            paidPaymentsList.appendChild(card);
+
+            const nameElement = card.querySelector('.customer-name');
+            const detailsElement = card.querySelector('.customer-details');
+
+            nameElement.addEventListener('click', () => {
+                if (detailsElement.style.display === 'block') {
+                    detailsElement.style.display = 'none';
+                    activeCustomerDiv = null;
+                } else {
+                    if (activeCustomerDiv && activeCustomerDiv !== detailsElement) {
+                        activeCustomerDiv.style.display = 'none';
+                    }
+                    detailsElement.innerHTML = '';
+                    detailsElement.style.display = 'block';
+                    activeCustomerDiv = detailsElement;
+                    showCustomerMonths(detailsElement, customer);
+                }
+            });
+        }
+    });
+}
+
+function showCustomerMonths(container, customer) {
+    const allMonths = new Set([
+        ...(customer.payments || []).map(p => p.monthKey),
+        ...(customer.removedMonths || [])
+    ]);
+
+    [...allMonths].sort(compareMonthKeys).forEach(monthKey => {
+        const monthPayments = (customer.payments || []).filter(p => p.monthKey === monthKey);
+        const totalPaid = monthPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        const monthBox = document.createElement('div');
+        monthBox.className = 'month-box';
+
+        if ((customer.removedMonths || []).includes(monthKey)) {
+            monthBox.classList.add('skipped');
+            monthBox.textContent = `${formatMonthKey(monthKey)} (Skipped)`;
+        } else {
+            if (totalPaid >= customer.interestAmount) monthBox.classList.add('paid');
+            monthBox.textContent = formatMonthKey(monthKey);
+            monthBox.addEventListener('click', () => showPaymentDetails(container, monthKey, monthPayments, customer.interestAmount));
+        }
+
+        container.appendChild(monthBox);
+    });
+}
+
+function showPaymentDetails(container, monthKey, payments, interestAmount) {
+    container.querySelectorAll('.history-details').forEach(el => el.remove());
+
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRemaining = Math.max(interestAmount - totalPaid, 0);
+
+    const historyDiv = document.createElement('div');
+    historyDiv.className = 'history-details';
+    historyDiv.innerHTML = `<strong>Payment History for ${formatMonthKey(monthKey)}</strong><br>`;
+    historyDiv.innerHTML += `<p>Total Amount: ₹${interestAmount}</p>`;
+    if (totalRemaining > 0) {
+        historyDiv.innerHTML += `<p>Remaining Amount: ₹${totalRemaining}</p>`;
+    }
+
+    payments.forEach(payment => {
+        const entry = document.createElement('div');
+        entry.className = 'payment-entry';
+        entry.innerHTML = `
+            <p>Amount Paid: ₹${payment.amount}</p>
+            ${payment.remaining > 0 ? `<p>Remaining on Payment: ₹${payment.remaining}</p>` : ''}
+            <p>Paid Date: ${formatDate(payment.date)}</p>
+        `;
+        historyDiv.appendChild(entry);
+    });
+
+    container.appendChild(historyDiv);
+}
+
+function compareMonthKeys(a, b) {
+    const [monthA, yearA] = a.split('-').map(Number);
+    const [monthB, yearB] = b.split('-').map(Number);
+
+    if (yearA !== yearB) {
+        return yearA - yearB;
+    }
+    return monthA - monthB;
+}
+
+function formatMonthKey(monthKey) {
+    const [month, year] = monthKey.split('-').map(Number);
+    return new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-GB');
+}
+
+renderPaidPayments();
+</script>
+
+</body>
+</html>

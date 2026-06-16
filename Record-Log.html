@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📋 Record Log - RVS Finance</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f4f4;
+    }
+    h2 {
+      position: relative;
+      text-align: center;
+      padding: 12px;
+      background: #333;
+      color: white;
+      margin: 0;
+    }
+    .home-link {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      color: white;
+      text-decoration: none;
+    }
+    .clear-btn {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .clear-btn:hover {
+      background: #c0392b;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      margin-top: 0;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background-color: #555;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>
+    <a class="home-link" href="Home.html">🏠</a>
+    Record Log
+    <button class="clear-btn" onclick="clearLogs()">🧹 Clear Logs</button>
+  </h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Action</th>
+        <th>Customer</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody id="logTableBody"></tbody>
+  </table>
+
+  <script>
+    const logs = JSON.parse(localStorage.getItem('record_logs') || '[]');
+    const tableBody = document.getElementById("logTableBody");
+    let currentCustomer = "-";
+    let currentDate = null;
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    function formatDate(dateStr) {
+      const parts = dateStr.split("/");
+      if (parts.length === 3) {
+        const day = parts[0];
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parts[2];
+        return `${day} ${monthNames[month]} ${year}`;
+      }
+      return dateStr;
+    }
+
+    logs.slice().reverse().forEach(log => {
+      const time = log.time || "";
+      const dateOnly = time.split(",")[0];         // "24/07/2025"
+      const timeOnly = time.split(",")[1]?.trim(); // "12:28:02"
+
+      // Insert new date header if date changes
+      if (dateOnly !== currentDate) {
+        currentDate = dateOnly;
+        const dateRow = document.createElement("tr");
+        const dateCell = document.createElement("td");
+        dateCell.colSpan = 4;
+        dateCell.textContent = ` ${formatDate(currentDate)}`;
+        dateCell.style.backgroundColor = "#ddd";
+        dateCell.style.fontWeight = "bold";
+        dateCell.style.textAlign = "center";
+        dateRow.appendChild(dateCell);
+        tableBody.appendChild(dateRow);
+      }
+
+      const tr = document.createElement("tr");
+
+      const timeCell = document.createElement("td");
+      const actionCell = document.createElement("td");
+      const customerCell = document.createElement("td");
+      const detailsCell = document.createElement("td");
+
+      timeCell.textContent = timeOnly || "-";
+      const msg = log.msg || "";
+      let customer = log.customer || "-";
+      let action = "Other";
+      let details = msg;
+
+      // Try to extract customer from message if not available
+      if (!log.customer) {
+        const nameMatch = msg.match(/for ([A-Za-z ]+)/);
+        if (nameMatch) {
+          customer = nameMatch[1].trim();
+          currentCustomer = customer;
+        }
+      }
+
+      // Action Matching
+      if (msg.includes("Edited customer:")) {
+        const match = msg.match(/Edited customer: (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "✏️ Edited";
+          details = "-";
+        }
+      } else if (msg.includes("Name changed for")) {
+        const match = msg.match(/Name changed for (.+): from (.+) to (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "✏️ Name Changed";
+          details = `from ${match[2]} to ${match[3]}`;
+        }
+      } else if (msg.includes("Place changed for")) {
+        const match = msg.match(/Place changed for (.+): from (.+) to (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "✏️ Place Changed";
+          details = `from ${match[2]} to ${match[3]}`;
+        }
+      } else if (msg.includes("Phone changed for")) {
+        const match = msg.match(/Phone changed for (.+): from (.+) to (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "✏️ Phone Changed";
+          details = `from ${match[2]} to ${match[3]}`;
+        }
+      } else if (msg.includes("Address changed for")) {
+        const match = msg.match(/Address changed for (.+): from (.+) to (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "✏️ Address Changed";
+          details = `from ${match[2]} to ${match[3]}`;
+        }
+      } else if (msg.includes("Interest Percent changed")) {
+        const match = msg.match(/Interest Percent changed from (.+) to (.+)/);
+        if (match) {
+          action = "✏️ Interest % Changed";
+          customer = customer || currentCustomer;
+          details = `from ${match[1]} to ${match[2]}`;
+        }
+      } else if (msg.includes("Interest Amount changed")) {
+        const match = msg.match(/Interest Amount changed from (.+) to (.+)/);
+        if (match) {
+          action = "✏️ Interest ₹ Changed";
+          customer = customer || currentCustomer;
+          details = `from ${match[1]} to ${match[2]}`;
+        }
+      } else if (msg.includes("Details changed")) {
+        const match = msg.match(/Details changed from (.+) to (.+)/);
+        if (match) {
+          action = "✏️ Details Changed";
+          customer = customer || currentCustomer;
+          details = `from ${match[1]} to ${match[2]}`;
+        }
+      } else if (msg.includes("Deleted customer")) {
+        const match = msg.match(/Deleted customer: (.+?) - ₹(.+?) for (.+)/);
+        if (match) {
+          customer = match[1].trim();
+          currentCustomer = customer;
+          action = "🗑️ Deleted";
+          details = `₹${match[2]} for ${match[3]}`;
+        }
+      } else if (msg.includes("Paid by")) {
+        const match = msg.match(/Paid by (.+): ₹(.+?) for (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "💰 Paid";
+          details = `₹${match[2]} for ${match[3]}`;
+        }
+      } else if (msg.includes("Skipped")) {
+        const match = msg.match(/Skipped (.+?) for (.+)/);
+        if (match) {
+          action = "⏭️ Skipped";
+          customer = match[2];
+          currentCustomer = customer;
+          details = `${match[1]} skipped`;
+        }
+      } else if (msg.includes("Added back payment")) {
+        const match = msg.match(/Added back payment for (.+): (.+)/);
+        if (match) {
+          customer = match[1];
+          currentCustomer = customer;
+          action = "➕ Added Back";
+          details = match[2];
+        }
+      } else if (msg.includes("Exported")) {
+        action = "📁 Exported";
+        customer = "-";
+        details = msg;
+      }
+
+      actionCell.textContent = action;
+      customerCell.textContent = customer || "-";
+      detailsCell.textContent = details;
+
+      tr.appendChild(timeCell);
+      tr.appendChild(actionCell);
+      tr.appendChild(customerCell);
+      tr.appendChild(detailsCell);
+
+      tableBody.appendChild(tr);
+    });
+
+    function clearLogs() {
+      localStorage.removeItem('record_logs');
+      location.reload();
+    }
+  </script>
+
+</body>
+</html>
